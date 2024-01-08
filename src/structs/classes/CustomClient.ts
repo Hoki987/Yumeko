@@ -1,9 +1,12 @@
 import { ApplicationCommandDataResolvable, Client, ClientEvents, Collection, GatewayIntentBits } from "discord.js";
 import { CommandType, ComponentsButton, ComponentsModal, ComponentsSelect } from "../types/Command";
+import { sequelize } from "../types/Command";
 import path from "path"
 import fs from "fs"
 import dotenv from "dotenv";
 import { EventType } from "../types/Event";
+import colors from "colors";
+import { Users } from "../models/Users";
 dotenv.config();
 
 const fileCondition = (fileName: string) => fileName.endsWith(".ts") || fileName.endsWith(".js")
@@ -25,10 +28,22 @@ export class CustomClient extends Client {
         })
     }
     public start() {
+        this.registerDatabase();
         this.registerModules();
         this.registerEvents();
         this.login(process.env.TOKEN)
+        Users.drop()
+        Users.sync({ force: true })
     }
+    private registerDatabase() {
+        try {
+            sequelize.authenticate();
+            console.log(`${colors.bold.green(`[DATABASE]`)}` + `Successfully connection to database!`.yellow);
+        } catch (error) {
+            console.error('Unable to connect to the database:', error);
+        }
+    }
+
     private registerCommands(commands: Array<ApplicationCommandDataResolvable>) {
         this.application?.commands.set(commands)
             .then(() => {
@@ -69,10 +84,10 @@ export class CustomClient extends Client {
                 const { name, once, run }: EventType<keyof ClientEvents> = (await import(`../../events/${local}/${fileName}`))?.default
 
                 try {
-                    if(name) (once) ? this.once(name, run) : this.on(name, run);
+                    if (name) (once) ? this.once(name, run) : this.on(name, run);
                 } catch (error) {
                     console.log(`An error occurred on event: ${name} \n${error}`.red);
-                    
+
                 }
             })
         })
